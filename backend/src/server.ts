@@ -15,13 +15,9 @@ import paymentRoutes from "./routes/payment.routes";
 
 const app = express();
 
-const PORT = process.env.PORT || 5000;
-
 app.use(helmet());
 
-const allowedOrigins = (
-  process.env.FRONTEND_URLS || ""
-)
+const allowedOrigins = (process.env.FRONTEND_URLS || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -29,8 +25,6 @@ const allowedOrigins = (
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without an Origin header
-      // such as Postman/server-to-server requests
       if (!origin) {
         return callback(null, true);
       }
@@ -45,9 +39,42 @@ app.use(
   })
 );
 
-
 app.use(cookieParser());
 app.use(express.json());
+
+let databaseInitialized = false;
+let databaseInitializationPromise: Promise<void> | null = null;
+
+const initializeDatabase = async (): Promise<void> => {
+  if (databaseInitialized) {
+    return;
+  }
+
+  if (!databaseInitializationPromise) {
+    databaseInitializationPromise = AppDataSource.initialize()
+      .then(() => {
+        databaseInitialized = true;
+        console.log("Database connected successfully");
+      })
+      .catch((error) => {
+        databaseInitializationPromise = null;
+        console.error("Database connection failed:", error);
+        throw error;
+      });
+  }
+
+  await databaseInitializationPromise;
+};
+
+app.use(async (_req, _res, next) => {
+  try {
+    await initializeDatabase();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/auth", authRoutes);
@@ -61,15 +88,4 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-AppDataSource.initialize()
-  .then(() => {
-    console.log("Database connected successfully");
-
-    app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error("Database connection failed:", error);
-    process.exit(1);
-  });
+export default app;
