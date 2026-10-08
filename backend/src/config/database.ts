@@ -1,6 +1,9 @@
 import "reflect-metadata";
+import "pg";
+
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";
+
 import { User } from "../entities/User";
 import { Category } from "../entities/Category";
 import { Product } from "../entities/Product";
